@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Global FIR Explorer — 全球飞行情报区查询系统</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --blue-50: #eff6ff; --blue-100: #dbeafe; --blue-200: #bfdbfe; --blue-300: #93c5fd;
+      --blue-400: #60a5fa; --blue-500: #3b82f6; --blue-600: #2563eb; --blue-700: #1d4ed8;
+      --blue-800: #1e40af; --blue-900: #1e3a8a;
+      --gray-50: #f8fafc; --gray-100: #f1f5f9; --gray-200: #e2e8f0; --gray-300: #cbd5e1;
+      --gray-400: #94a3b8; --gray-500: #64748b; --gray-600: #475569; --gray-700: #334155;
+      --gray-800: #1e293b; --gray-900: #0f172a;
+      --white: #ffffff;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.05);
+      --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--gray-100); color: var(--gray-800); min-height: 100vh; overflow-x: hidden;
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      background: linear-gradient(135deg, var(--blue-900) 0%, var(--blue-700) 50%, var(--blue-600) 100%);
+      color: var(--white); padding: 0; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 4px 20px rgba(30, 64, 175, 0.25);
+    }
+    .header-inner {
+      max-width: 1440px; margin: 0 auto; padding: 18px 32px;
+      display: flex; align-items: center; justify-content: space-between; gap: 20px;
+    }
+    .brand { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+    .brand-icon {
+      width: 44px; height: 44px; background: rgba(255,255,255,0.15); border-radius: 12px;
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+      backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);
+    }
+    .brand-text h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.2; }
+    .brand-text p { font-size: 11px; opacity: 0.7; font-weight: 400; letter-spacing: 0.5px; text-transform: uppercase; }
+
+    /* ===== SEARCH BAR ===== */
+    .search-wrapper { flex: 1; max-width: 480px; position: relative; }
+    .search-wrapper input {
+      width: 100%; padding: 11px 18px 11px 44px;
+      border: 2px solid rgba(255,255,255,0.2); border-radius: 12px;
+      background: rgba(255,255,255,0.1); color: var(--white);
+      font-size: 14px; font-family: inherit; outline: none;
+      backdrop-filter: blur(10px); transition: all 0.3s;
+    }
+    .search-wrapper input::placeholder { color: rgba(255,255,255,0.5); }
+    .search-wrapper input:focus {
+      background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.45);
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.1);
+    }
+    .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); opacity: 0.5; pointer-events: none; font-size: 16px; }
+    .search-clear {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      width: 24px; height: 24px; border-radius: 50%; border: none;
+      background: rgba(255,255,255,0.2); color: white; font-size: 13px;
+      cursor: pointer; display: none; align-items: center; justify-content: center; transition: background 0.2s;
+    }
+    .search-clear:hover { background: rgba(255,255,255,0.35); }
+    .search-clear.show { display: flex; }
+
+    /* Header right group */
+    .header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+    .stats-badge {
+      display: flex; align-items: center; gap: 6px; padding: 8px 16px;
+      background: rgba(255,255,255,0.1); border-radius: 10px; font-size: 13px; font-weight: 500;
+      flex-shrink: 0; border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(10px);
+    }
+    .stats-badge .num { font-size: 18px; font-weight: 800; color: var(--blue-200); }
+
+    /* ===== LANGUAGE SELECTOR ===== */
+    .lang-selector { position: relative; flex-shrink: 0; }
+    .lang-btn {
+      display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px; color: white; font-size: 13px; font-weight: 500;
+      cursor: pointer; backdrop-filter: blur(10px); transition: all 0.2s; font-family: inherit;
+      white-space: nowrap;
+    }
+    .lang-btn:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); }
+    .lang-btn .lang-flag { font-size: 17px; line-height: 1; }
+    .lang-btn .lang-arrow { font-size: 10px; opacity: 0.6; transition: transform 0.2s; }
+    .lang-btn.open .lang-arrow { transform: rotate(180deg); }
+
+    .lang-dropdown {
+      position: absolute; top: calc(100% + 8px); right: 0;
+      background: var(--white); border-radius: 14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05);
+      overflow: hidden; min-width: 280px; display: none; z-index: 500;
+      animation: dropIn 0.2s ease;
+    }
+    .lang-dropdown.show { display: block; }
+    @keyframes dropIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .lang-dropdown-header {
+      padding: 12px 16px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--gray-400); border-bottom: 1px solid var(--gray-100);
+    }
+    .lang-option {
+      display: flex; align-items: center; gap: 12px; padding: 11px 16px;
+      font-size: 14px; color: var(--gray-700); cursor: pointer; transition: background 0.15s;
+      border: none; background: none; width: 100%; text-align: left; font-family: inherit;
+    }
+    .lang-option:hover { background: var(--blue-50); }
+    .lang-option.active { background: var(--blue-50); color: var(--blue-700); font-weight: 600; }
+    .lang-option .lf { font-size: 20px; line-height: 1; }
+    .lang-option .ll { flex: 1; }
+    .lang-option .lc { font-size: 11px; color: var(--gray-400); font-weight: 400; }
+    .lang-option .check { color: var(--blue-500); font-weight: 700; font-size: 16px; display: none; }
+    .lang-option.active .check { display: block; }
+
+    /* ===== TOOLBAR ===== */
+    .toolbar { background: var(--white); border-bottom: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); }
+    .toolbar-inner {
+      max-width: 1440px; margin: 0 auto; padding: 12px 32px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .filter-btn {
+      padding: 7px 16px; border-radius: 8px; border: 1.5px solid var(--gray-200);
+      background: var(--white); color: var(--gray-600); font-size: 13px; font-weight: 500;
+      font-family: inherit; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .filter-btn:hover { background: var(--blue-50); border-color: var(--blue-300); color: var(--blue-700); }
+    .filter-btn.active {
+      background: var(--blue-600); border-color: var(--blue-600); color: var(--white);
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    }
+    .toolbar-sep { width: 1px; height: 28px; background: var(--gray-200); margin: 0 6px; }
+    .sort-select {
+      padding: 7px 32px 7px 12px; border: 1.5px solid var(--gray-200); border-radius: 8px;
+      background: var(--white); color: var(--gray-600); font-size: 13px; font-family: inherit;
+      font-weight: 500; cursor: pointer; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center; transition: all 0.2s;
+    }
+    .sort-select:focus { outline: none; border-color: var(--blue-400); box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+    .result-count { margin-left: auto; font-size: 13px; color: var(--gray-400); font-weight: 500; }
+    .result-count span { color: var(--blue-600); font-weight: 700; }
+
+    /* ===== MAIN LAYOUT ===== */
+    .main { max-width: 1440px; margin: 0 auto; padding: 24px 32px 80px; }
+    .fir-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+
+    /* ===== CARD ===== */
+    .fir-card {
+      background: var(--white); border-radius: 14px; border: 1.5px solid var(--gray-200);
+      padding: 20px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative; overflow: hidden;
+    }
+    .fir-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--blue-500), var(--blue-400)); opacity: 0; transition: opacity 0.25s;
+    }
+    .fir-card:hover { border-color: var(--blue-300); box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+    .fir-card:hover::before { opacity: 1; }
+
+    .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .card-icao {
+      padding: 4px 10px; background: var(--blue-50); color: var(--blue-700); border-radius: 6px;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.5px; font-family: 'SF Mono', 'Fira Code', monospace;
+      border: 1px solid var(--blue-100); flex-shrink: 0;
+    }
+    .card-continent { padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+    .continent-亚洲 { background: #fef3c7; color: #92400e; }
+    .continent-欧洲 { background: #dbeafe; color: #1e40af; }
+    .continent-非洲 { background: #d1fae5; color: #065f46; }
+    .continent-北美洲 { background: #ede9fe; color: #5b21b6; }
+    .continent-南美洲 { background: #fce7f3; color: #9d174d; }
+    .continent-大洋洲 { background: #e0f2fe; color: #075985; }
+    .continent-中东 { background: #fff7ed; color: #9a3412; }
+
+    .card-name { font-size: 16px; font-weight: 700; color: var(--gray-800); line-height: 1.35; margin-bottom: 2px; }
+    .card-name-en { font-size: 12px; color: var(--gray-400); font-weight: 500; margin-bottom: 12px; }
+    .card-info { display: flex; flex-direction: column; gap: 6px; }
+    .card-info-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--gray-500); }
+    .card-info-row .icon { width: 18px; text-align: center; flex-shrink: 0; font-size: 13px; }
+    .card-info-row .label { color: var(--gray-400); font-size: 12px; min-width: 36px; }
+    .card-info-row .value { font-weight: 500; color: var(--gray-700); }
+    .card-arrow {
+      position: absolute; right: 16px; bottom: 16px; width: 28px; height: 28px;
+      border-radius: 50%; background: var(--gray-100); display: flex; align-items: center;
+      justify-content: center; font-size: 12px; color: var(--gray-400); transition: all 0.25s;
+    }
+    .fir-card:hover .card-arrow { background: var(--blue-500); color: var(--white); }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state { grid-column: 1 / -1; text-align: center; padding: 80px 20px; }
+    .empty-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.3; }
+    .empty-title { font-size: 18px; font-weight: 600; color: var(--gray-500); margin-bottom: 6px; }
+    .empty-desc { font-size: 14px; color: var(--gray-400); }
+
+    /* ===== DETAIL MODAL ===== */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(6px);
+      z-index: 200; display: none; align-items: center; justify-content: center; padding: 24px;
+      animation: fadeIn 0.25s ease;
+    }
+    .modal-overlay.show { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(30px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+    .modal-content {
+      background: var(--white); border-radius: 20px; max-width: 720px; width: 100%;
+      max-height: 92vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.2);
+      animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-header {
+      background: linear-gradient(135deg, var(--blue-800) 0%, var(--blue-600) 100%);
+      color: var(--white); padding: 28px 32px 24px; border-radius: 20px 20px 0 0; position: relative;
+    }
+    .modal-close {
+      position: absolute; top: 16px; right: 16px; width: 36px; height: 36px;
+      border-radius: 50%; border: none; background: rgba(255,255,255,0.15); color: white;
+      font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s; backdrop-filter: blur(10px);
+    }
+    .modal-close:hover { background: rgba(255,255,255,0.3); }
+    .modal-badge {
+      display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+      background: rgba(255,255,255,0.15); border-radius: 8px; font-size: 13px; font-weight: 700;
+      letter-spacing: 0.5px; margin-bottom: 12px; font-family: 'SF Mono', 'Fira Code', monospace;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .modal-title { font-size: 24px; font-weight: 800; margin-bottom: 4px; line-height: 1.3; }
+    .modal-subtitle { font-size: 14px; opacity: 0.7; font-weight: 400; }
+
+    .modal-body { padding: 28px 32px; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+    .detail-card { background: var(--gray-50); border-radius: 12px; padding: 16px; border: 1px solid var(--gray-100); }
+    .detail-card.full { grid-column: 1 / -1; }
+    .detail-card .dc-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--gray-400); margin-bottom: 6px; }
+    .detail-card .dc-value { font-size: 16px; font-weight: 700; color: var(--gray-800); }
+    .detail-card .dc-sub { font-size: 12px; color: var(--gray-400); margin-top: 3px; font-weight: 500; }
+
+    .coord-display { display: flex; gap: 12px; flex-wrap: wrap; }
+    .coord-chip {
+      display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+      background: var(--white); border-radius: 8px; border: 1px solid var(--gray-200);
+      font-size: 13px; font-weight: 600; color: var(--blue-700); font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    .coord-chip .coord-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--gray-400);
+      font-family: 'Inter', sans-serif; letter-spacing: 0.5px;
+    }
+
+    .map-section { margin-top: 4px; }
+    .map-section-title { font-size: 14px; font-weight: 700; color: var(--gray-700); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .map-container { width: 100%; height: 380px; border-radius: 14px; overflow: hidden; border: 2px solid var(--gray-200); box-shadow: var(--shadow-md); }
+    #detail-map { width: 100%; height: 100%; }
+
+    .footer { text-align: center; padding: 24px; font-size: 12px; color: var(--gray-400); border-top: 1px solid var(--gray-200); background: var(--white); }
+
+    @media (max-width: 768px) {
+      .header-inner { padding: 14px 16px; flex-wrap: wrap; }
+      .search-wrapper { max-width: 100%; order: 3; width: 100%; }
+      .stats-badge { display: none; }
+      .toolbar-inner { padding: 10px 16px; }
+      .main { padding: 16px; }
+      .fir-grid { grid-template-columns: 1fr; gap: 12px; }
+      .modal-overlay { padding: 8px; align-items: flex-end; }
+      .modal-content { max-height: 95vh; border-radius: 20px 20px 0 0; }
+      .modal-header { padding: 24px 20px 20px; }
+      .modal-body { padding: 20px; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .map-container { height: 280px; }
+      .brand-text p { display: none; }
+    }
+
+    .modal-content::-webkit-scrollbar { width: 6px; }
+    .modal-content::-webkit-scrollbar-track { background: transparent; }
+    .modal-content::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+    mark { background: var(--blue-100); color: var(--blue-800); padding: 0 2px; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">✈</div>
+        <div class="brand-text">
+          <h1 id="brandTitle">Global FIR Explorer</h1>
+          <p id="brandSubtitle">全球飞行情报区查询系统</p>
+        </div>
+      </div>
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="" autocomplete="off" />
+        <button class="search-clear" id="clearBtn" onclick="clearSearch()">✕</button>
+      </div>
+      <div class="header-right">
+        <div class="stats-badge">
+          <span class="num" id="totalCount">0</span>
+          <span id="statsLabel">飞行情报区</span>
+        </div>
+        <!-- LANGUAGE SELECTOR -->
+        <div class="lang-selector" id="langSelector">
+          <button class="lang-btn" id="langBtn" onclick="toggleLangDropdown(event)">
+            <span class="lang-flag" id="langFlag">🇨🇳</span>
+            <span id="langLabel">简体中文</span>
+            <span class="lang-arrow">▼</span>
+          </button>
+          <div class="lang-dropdown" id="langDropdown">
+            <div class="lang-dropdown-header" id="langDropdownHeader">Language / 语言</div>
+            <button class="lang-option active" data-lang="zh-CN" onclick="setLang('zh-CN')">
+              <span class="lf">🇨🇳</span><span class="ll">简体中文</span><span class="lc">Simplified Chinese</span><span class="check">✓</span>
+            </button>
+            <button class="lang-option" data-lang="zh-TW" onclick="setLang('zh-TW')">
+              <span class="lf">🇹🇼</span><span class="ll">繁體中文</span><span class="lc">Traditional Chinese</span><span class="check">✓</span>
+            </button>
+            <button class="lang-option" data-lang="en" onclick="setLang('en')">
+              <span class="lf">🇺🇸</span><span class="ll">English</span><span class="lc">English</span><span class="check">✓</span>
+            </button>
+            <button class="lang-option" data-lang="ja" onclick="setLang('ja')">
+              <span class="lf">🇯🇵</span><span class="ll">日本語</span><span class="lc">Japanese</span><span class="check">✓</span>
+            </button>
+            <button class="lang-option" data-lang="ko" onclick="setLang('ko')">
+              <span class="lf">🇰🇷</span><span class="ll">한국어</span><span class="lc">Korean</span><span class="check">✓</span>
+            </button>
+            <button class="lang-option" data-lang="classical" onclick="setLang('classical')">
+              <span class="lf">🏛️</span><span class="ll">文言文（華夏）</span><span class="lc">Classical Chinese</span><span class="check">✓</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="toolbar-inner" id="toolbar"></div>
+  </div>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="fir-grid" id="firGrid"></div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer" id="footerText"></footer>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
+    <div class="modal-content" id="modalContent">
+      <div class="modal-header">
+        <button class="modal-close" onclick="closeModal()">✕</button>
+        <div class="modal-badge" id="modalIcao"></div>
+        <div class="modal-title" id="modalTitle"></div>
+        <div class="modal-subtitle" id="modalSubtitle"></div>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid" id="detailGrid"></div>
+        <div class="map-section">
+          <div class="map-section-title" id="mapSectionTitle">🗺️ 飞行情报区覆盖范围</div>
+          <div class="map-container">
+            <div id="detail-map"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA -->
+  <script src="FIR-data.js"></script>
+
+  <script>
+    // ============================================================
+    //  I18N — LANGUAGE SYSTEM
+    // ============================================================
+    const LANG_META = {
+      'zh-CN': { flag: '🇨🇳', label: '简体中文' },
+      'zh-TW': { flag: '🇹🇼', label: '繁體中文' },
+      'en':    { flag: '🇺🇸', label: 'English' },
+      'ja':    { flag: '🇯🇵', label: '日本語' },
+      'ko':    { flag: '🇰🇷', label: '한국어' },
+      'classical': { flag: '🏛️', label: '文言文（華夏）' }
+    };
+
+    // --- UI Translations ---
+    const UI = {
+      'zh-CN': {
+        title: 'Global FIR Explorer', subtitle: '全球飞行情报区查询系统',
+        searchPlaceholder: '搜索国家、城市、ICAO代码或飞行情报区名称…',
+        statsLabel: '飞行情报区',
+        filterAll: '全部', sortName: '按名称排序', sortCountry: '按国家排序', sortICAO: '按 ICAO 排序',
+        resultFound: '找到 <span>{n}</span> 个飞行情报区',
+        cardCountry: '国家', cardCoord: '坐标',
+        emptyTitle: '未找到匹配的飞行情报区', emptyDesc: '请尝试调整搜索关键词或切换大洲筛选',
+        modalCountry: '🌐 覆盖国家/地区', modalICAO: '🏷️ ICAO 代码', modalCenter: '📍 中心坐标',
+        modalBoundary: '📐 边界范围', modalLat: '纬度', modalLng: '经度', mapTitle: '🗺️ 飞行情报区覆盖范围',
+        footer: 'Global FIR Explorer © 2026 — 全球飞行情报区信息仅供参考，请以官方航空公报为准',
+        latN: '北纬', latS: '南纬', lngE: '东经', lngW: '西经', langHeader: 'Language / 语言'
+      },
+      'zh-TW': {
+        title: 'Global FIR Explorer', subtitle: '全球飛行情報區查詢系統',
+        searchPlaceholder: '搜尋國家、城市、ICAO代碼或飛行情報區名稱…',
+        statsLabel: '飛行情報區',
+        filterAll: '全部', sortName: '按名稱排序', sortCountry: '按國家排序', sortICAO: '按 ICAO 排序',
+        resultFound: '找到 <span>{n}</span> 個飛行情報區',
+        cardCountry: '國家', cardCoord: '座標',
+        emptyTitle: '未找到匹配的飛行情報區', emptyDesc: '請嘗試調整搜尋關鍵詞或切換大洲篩選',
+        modalCountry: '🌐 覆蓋國家/地區', modalICAO: '🏷️ ICAO 代碼', modalCenter: '📍 中心座標',
+        modalBoundary: '📐 邊界範圍', modalLat: '緯度', modalLng: '經度', mapTitle: '🗺️ 飛行情報區覆蓋範圍',
+        footer: 'Global FIR Explorer © 2026 — 全球飛行情報區資訊僅供參考，請以官方航空公報為準',
+        latN: '北緯', latS: '南緯', lngE: '東經', lngW: '西經', langHeader: 'Language / 語言'
+      },
+      'en': {
+        title: 'Global FIR Explorer', subtitle: 'Flight Information Region Database',
+        searchPlaceholder: 'Search by country, city, ICAO code or FIR name…',
+        statsLabel: 'FIRs',
+        filterAll: 'All', sortName: 'Sort by Name', sortCountry: 'Sort by Country', sortICAO: 'Sort by ICAO',
+        resultFound: '<span>{n}</span> Flight Information Regions found',
+        cardCountry: 'Country', cardCoord: 'Coord',
+        emptyTitle: 'No matching FIR found', emptyDesc: 'Try adjusting your search keywords or switch continent filter',
+        modalCountry: '🌐 Coverage', modalICAO: '🏷️ ICAO Code', modalCenter: '📍 Center Coordinates',
+        modalBoundary: '📐 Boundary', modalLat: 'LAT', modalLng: 'LNG', mapTitle: '🗺️ FIR Coverage Area',
+        footer: 'Global FIR Explorer © 2026 — FIR data is for reference only. Please refer to official aeronautical publications.',
+        latN: 'N', latS: 'S', lngE: 'E', lngW: 'W', langHeader: 'Language'
+      },
+      'ja': {
+        title: 'Global FIR Explorer', subtitle: '世界飛行情報区検索システム',
+        searchPlaceholder: '国名、都市名、ICAOコード、飛行情報区名で検索…',
+        statsLabel: '飛行情報区',
+        filterAll: 'すべて', sortName: '名前順', sortCountry: '国順', sortICAO: 'ICAO順',
+        resultFound: '<span>{n}</span> 件の飛行情報区が見つかりました',
+        cardCountry: '国', cardCoord: '座標',
+        emptyTitle: '該当する飛行情報区が見つかりません', emptyDesc: '検索キーワードを変更するか、大陸フィルターを切り替えてみてください',
+        modalCountry: '🌐 管轄国・地域', modalICAO: '🏷️ ICAOコード', modalCenter: '📍 中心座標',
+        modalBoundary: '📐 境界範囲', modalLat: '緯度', modalLng: '経度', mapTitle: '🗺️ 飛行情報区カバー範囲',
+        footer: 'Global FIR Explorer © 2026 — 飛行情報区データは参考情報です。公式の航空公報をご確認ください。',
+        latN: '北緯', latS: '南緯', lngE: '東経', lngW: '西経', langHeader: '言語 / Language'
+      },
+      'ko': {
+        title: 'Global FIR Explorer', subtitle: '세계 비행정보구역 검색 시스템',
+        searchPlaceholder: '국가, 도시, ICAO 코드 또는 비행정보구역 이름 검색…',
+        statsLabel: '비행정보구역',
+        filterAll: '전체', sortName: '이름순', sortCountry: '국가순', sortICAO: 'ICAO순',
+        resultFound: '<span>{n}</span> 개의 비행정보구역을 찾았습니다',
+        cardCountry: '국가', cardCoord: '좌표',
+        emptyTitle: '일치하는 비행정보구역이 없습니다', emptyDesc: '검색어를 조정하거나 대륙 필터를 변경해 보세요',
+        modalCountry: '🌐 관할 국가/지역', modalICAO: '🏷️ ICAO 코드', modalCenter: '📍 중심 좌표',
+        modalBoundary: '📐 경계 범위', modalLat: '위도', modalLng: '경도', mapTitle: '🗺️ 비행정보구역 커버리지',
+        footer: 'Global FIR Explorer © 2026 — 비행정보구역 데이터는 참고용입니다. 공식 항공 공보를 확인하세요.',
+        latN: '북위', latS: '남위', lngE: '동경', lngW: '서경', langHeader: '언어 / Language'
+      },
+      'classical': {
+        title: 'Global FIR Explorer', subtitle: '天下飛行情報區覽查典',
+        searchPlaceholder: '查邦國、城邑、ICAO符碼或飛行情報區名……',
+        statsLabel: '飛行情報區',
+        filterAll: '全覽', sortName: '依名排列', sortCountry: '依邦國排列', sortICAO: '依ICAO排列',
+        resultFound: '得 <span>{n}</span> 飛行情報區',
+        cardCountry: '邦國', cardCoord: '經緯',
+        emptyTitle: '未得相符之飛行情報區', emptyDesc: '請更易查覽之詞，或變易洲域之篩',
+        modalCountry: '🌐 所轄邦國', modalICAO: '🏷️ ICAO 符碼', modalCenter: '📍 中心經緯',
+        modalBoundary: '📐 疆界範圍', modalLat: '緯', modalLng: '經', mapTitle: '🗺️ 飛行情報區所轄疆域',
+        footer: 'Global FIR Explorer © 2026 — 天下飛行情報區所載資料僅供參閱，當以官方航空公報為準',
+        latN: '北緯', latS: '南緯', lngE: '東經', lngW: '西經', langHeader: '語言 / Language'
+      }
+    };
+
+    // --- Continent Translations ---
+    const CONTINENTS_I18N = {
+      '亚洲':  { 'zh-CN':'🌏 亚洲','zh-TW':'🌏 亞洲','en':'🌏 Asia','ja':'🌏 アジア','ko':'🌏 아시아','classical':'🌏 亞細亞' },
+      '欧洲':  { 'zh-CN':'🌍 欧洲','zh-TW':'🌍 歐洲','en':'🌍 Europe','ja':'🌍 ヨーロッパ','ko':'🌍 유럽','classical':'🌍 歐羅巴' },
+      '非洲':  { 'zh-CN':'🌍 非洲','zh-TW':'🌍 非洲','en':'🌍 Africa','ja':'🌍 アフリカ','ko':'🌍 아프리카','classical':'🌍 阿非利加' },
+      '北美洲': { 'zh-CN':'🌎 北美洲','zh-TW':'🌎 北美洲','en':'🌎 N. America','ja':'🌎 北アメリカ','ko':'🌎 북아메리카','classical':'🌎 北亞美利加' },
+      '南美洲': { 'zh-CN':'🌎 南美洲','zh-TW':'🌎 南美洲','en':'🌎 S. America','ja':'🌎 南アメリカ','ko':'🌎 남아메리카','classical':'🌎 南亞美利加' },
+      '大洋洲': { 'zh-CN':'🌏 大洋洲','zh-TW':'🌏 大洋洲','en':'🌏 Oceania','ja':'🌏 オセアニア','ko':'🌏 오세아니아','classical':'🌏 大洋洲' },
+      '中东':  { 'zh-CN':'🕌 中东','zh-TW':'🕌 中東','en':'🕌 Mid East','ja':'🕌 中東','ko':'🕌 중동','classical':'🕌 中東' }
+    };
+
+    // continent label for card badges (without emoji)
+    const CONT_LABEL = {
+      '亚洲':  { 'zh-CN':'亚洲','zh-TW':'亞洲','en':'Asia','ja':'アジア','ko':'아시아','classical':'亞細亞' },
+      '欧洲':  { 'zh-CN':'欧洲','zh-TW':'歐洲','en':'Europe','ja':'ヨーロッパ','ko':'유럽','classical':'歐羅巴' },
+      '非洲':  { 'zh-CN':'非洲','zh-TW':'非洲','en':'Africa','ja':'アフリカ','ko':'아프리카','classical':'阿非利加' },
+      '北美洲': { 'zh-CN':'北美洲','zh-TW':'北美洲','en':'N. America','ja':'北米','ko':'북미','classical':'北亞美利加' },
+      '南美洲': { 'zh-CN':'南美洲','zh-TW':'南美洲','en':'S. America','ja':'南米','ko':'남미','classical':'南亞美利加' },
+      '大洋洲': { 'zh-CN':'大洋洲','zh-TW':'大洋洲','en':'Oceania','ja':'オセアニア','ko':'오세아니아','classical':'大洋洲' },
+      '中东':  { 'zh-CN':'中东','zh-TW':'中東','en':'Mid East','ja':'中東','ko':'중동','classical':'中東' }
+    };
+
+    // --- Country Name Translations ---
+    const COUNTRY_I18N = {
+      '加纳':{t:'加納',en:'Ghana',ja:'ガーナ',ko:'가나',cl:'加納'},
+      '埃塞俄比亚':{t:'衣索比亞',en:'Ethiopia',ja:'エチオピア',ko:'에티오피아',cl:'衣索比亞'},
+      '阿尔及利亚':{t:'阿爾及利亞',en:'Algeria',ja:'アルジェリア',ko:'알제리',cl:'阿爾及利亞'},
+      '马达加斯加':{t:'馬達加斯加',en:'Madagascar',ja:'マダガスカル',ko:'마다가스카르',cl:'馬達加斯加'},
+      '埃及':{t:'埃及',en:'Egypt',ja:'エジプト',ko:'이집트',cl:'埃及'},
+      '摩洛哥':{t:'摩洛哥',en:'Morocco',ja:'モロッコ',ko:'모로코',cl:'摩洛哥'},
+      '塞内加尔':{t:'塞內加爾',en:'Senegal',ja:'セネガル',ko:'세네갈',cl:'塞內加爾'},
+      '坦桑尼亚':{t:'坦尚尼亞',en:'Tanzania',ja:'タンザニア',ko:'탄자니아',cl:'坦尚尼亞'},
+      '乍得':{t:'乍得',en:'Chad',ja:'チャド',ko:'차드',cl:'乍得'},
+      '南非':{t:'南非',en:'South Africa',ja:'南アフリカ',ko:'남아프리카공화국',cl:'南非'},
+      '刚果（金）':{t:'剛果（金）',en:'DR Congo',ja:'コンゴ民主共和国',ko:'콩고민주공화국',cl:'剛果'},
+      '尼日利亚':{t:'奈及利亞',en:'Nigeria',ja:'ナイジェリア',ko:'나이지리아',cl:'奈及利亞'},
+      '赞比亚':{t:'尚比亞',en:'Zambia',ja:'ザンビア',ko:'잠비아',cl:'尚比亞'},
+      '肯尼亚':{t:'肯亞',en:'Kenya',ja:'ケニア',ko:'케냐',cl:'肯亞'},
+      '利比亚':{t:'利比亞',en:'Libya',ja:'リビア',ko:'리비아',cl:'利比亞'},
+      '突尼斯':{t:'突尼西亞',en:'Tunisia',ja:'チュニジア',ko:'튀니지',cl:'突尼西亞'},
+      '津巴布韦':{t:'辛巴威',en:'Zimbabwe',ja:'ジンバブエ',ko:'짐바브웨',cl:'辛巴威'},
+      '中国':{t:'中國',en:'China',ja:'中国',ko:'중국',cl:'中國'},
+      '中国香港':{t:'中國香港',en:'Hong Kong',ja:'香港',ko:'홍콩',cl:'香港'},
+      '中国台湾':{t:'臺灣',en:'Taiwan',ja:'台湾',ko:'대만',cl:'臺灣'},
+      '日本':{t:'日本',en:'Japan',ja:'日本',ko:'일본',cl:'日本'},
+      '韩国':{t:'韓國',en:'South Korea',ja:'韓国',ko:'대한민국',cl:'韓國'},
+      '朝鲜':{t:'北韓',en:'North Korea',ja:'北朝鮮',ko:'조선',cl:'朝鮮'},
+      '蒙古':{t:'蒙古',en:'Mongolia',ja:'モンゴル',ko:'몽골',cl:'蒙古'},
+      '越南':{t:'越南',en:'Vietnam',ja:'ベトナム',ko:'베트남',cl:'越南'},
+      '泰国':{t:'泰國',en:'Thailand',ja:'タイ',ko:'태국',cl:'泰國'},
+      '柬埔寨':{t:'柬埔寨',en:'Cambodia',ja:'カンボジア',ko:'캄보디아',cl:'柬埔寨'},
+      '老挝':{t:'寮國',en:'Laos',ja:'ラオス',ko:'라오스',cl:'寮國'},
+      '缅甸':{t:'緬甸',en:'Myanmar',ja:'ミャンマー',ko:'미얀마',cl:'緬甸'},
+      '马来西亚':{t:'馬來西亞',en:'Malaysia',ja:'マレーシア',ko:'말레이시아',cl:'馬來西亞'},
+      '新加坡':{t:'新加坡',en:'Singapore',ja:'シンガポール',ko:'싱가포르',cl:'新加坡'},
+      '印度尼西亚':{t:'印度尼西亞',en:'Indonesia',ja:'インドネシア',ko:'인도네시아',cl:'印度尼西亞'},
+      '菲律宾':{t:'菲律賓',en:'Philippines',ja:'フィリピン',ko:'필리핀',cl:'菲律賓'},
+      '印度':{t:'印度',en:'India',ja:'インド',ko:'인도',cl:'印度'},
+      '斯里兰卡':{t:'斯里蘭卡',en:'Sri Lanka',ja:'スリランカ',ko:'스리랑카',cl:'斯里蘭卡'},
+      '孟加拉国':{t:'孟加拉國',en:'Bangladesh',ja:'バングラデシュ',ko:'방글라데시',cl:'孟加拉'},
+      '尼泊尔':{t:'尼泊爾',en:'Nepal',ja:'ネパール',ko:'네팔',cl:'尼泊爾'},
+      '巴基斯坦':{t:'巴基斯坦',en:'Pakistan',ja:'パキスタン',ko:'파키스탄',cl:'巴基斯坦'},
+      '阿富汗':{t:'阿富汗',en:'Afghanistan',ja:'アフガニスタン',ko:'아프가니스탄',cl:'阿富汗'},
+      '伊朗':{t:'伊朗',en:'Iran',ja:'イラン',ko:'이란',cl:'伊朗'},
+      '伊拉克':{t:'伊拉克',en:'Iraq',ja:'イラク',ko:'이라크',cl:'伊拉克'},
+      '沙特阿拉伯':{t:'沙烏地阿拉伯',en:'Saudi Arabia',ja:'サウジアラビア',ko:'사우디아라비아',cl:'沙烏地'},
+      '阿联酋':{t:'阿聯酋',en:'UAE',ja:'UAE',ko:'아랍에미리트',cl:'阿聯酋'},
+      '卡塔尔':{t:'卡達',en:'Qatar',ja:'カタール',ko:'카타르',cl:'卡達'},
+      '巴林':{t:'巴林',en:'Bahrain',ja:'バーレーン',ko:'바레인',cl:'巴林'},
+      '科威特':{t:'科威特',en:'Kuwait',ja:'クウェート',ko:'쿠웨이트',cl:'科威特'},
+      '阿曼':{t:'阿曼',en:'Oman',ja:'オマーン',ko:'오만',cl:'阿曼'},
+      '约旦':{t:'約旦',en:'Jordan',ja:'ヨルダン',ko:'요르단',cl:'約旦'},
+      '黎巴嫩':{t:'黎巴嫩',en:'Lebanon',ja:'レバノン',ko:'레바논',cl:'黎巴嫩'},
+      '叙利亚':{t:'敘利亞',en:'Syria',ja:'シリア',ko:'시리아',cl:'敘利亞'},
+      '以色列':{t:'以色列',en:'Israel',ja:'イスラエル',ko:'이스라엘',cl:'以色列'},
+      '也门':{t:'葉門',en:'Yemen',ja:'イエメン',ko:'예멘',cl:'葉門'},
+      '哈萨克斯坦':{t:'哈薩克斯坦',en:'Kazakhstan',ja:'カザフスタン',ko:'카자흐스탄',cl:'哈薩克'},
+      '乌兹别克斯坦':{t:'烏茲別克斯坦',en:'Uzbekistan',ja:'ウズベキスタン',ko:'우즈베키스탄',cl:'烏茲別克'},
+      '吉尔吉斯斯坦':{t:'吉爾吉斯斯坦',en:'Kyrgyzstan',ja:'キルギス',ko:'키르기스스탄',cl:'吉爾吉斯'},
+      '塔吉克斯坦':{t:'塔吉克斯坦',en:'Tajikistan',ja:'タジキスタン',ko:'타지키스탄',cl:'塔吉克'},
+      '土库曼斯坦':{t:'土庫曼斯坦',en:'Turkmenistan',ja:'トルクメニスタン',ko:'투르크메니스탄',cl:'土庫曼'},
+      '法国':{t:'法國',en:'France',ja:'フランス',ko:'프랑스',cl:'法蘭西'},
+      '英国':{t:'英國',en:'United Kingdom',ja:'イギリス',ko:'영국',cl:'英吉利'},
+      '爱尔兰':{t:'愛爾蘭',en:'Ireland',ja:'アイルランド',ko:'아일랜드',cl:'愛爾蘭'},
+      '德国':{t:'德國',en:'Germany',ja:'ドイツ',ko:'독일',cl:'德意志'},
+      '意大利':{t:'義大利',en:'Italy',ja:'イタリア',ko:'이탈리아',cl:'義大利'},
+      '西班牙':{t:'西班牙',en:'Spain',ja:'スペイン',ko:'스페인',cl:'西班牙'},
+      '葡萄牙':{t:'葡萄牙',en:'Portugal',ja:'ポルトガル',ko:'포르투갈',cl:'葡萄牙'},
+      '荷兰':{t:'荷蘭',en:'Netherlands',ja:'オランダ',ko:'네덜란드',cl:'荷蘭'},
+      '比利时':{t:'比利時',en:'Belgium',ja:'ベルギー',ko:'벨기에',cl:'比利時'},
+      '瑞士':{t:'瑞士',en:'Switzerland',ja:'スイス',ko:'스위스',cl:'瑞士'},
+      '奥地利':{t:'奧地利',en:'Austria',ja:'オーストリア',ko:'오스트리아',cl:'奧地利'},
+      '波兰':{t:'波蘭',en:'Poland',ja:'ポーランド',ko:'폴란드',cl:'波蘭'},
+      '捷克':{t:'捷克',en:'Czech Republic',ja:'チェコ',ko:'체코',cl:'捷克'},
+      '匈牙利':{t:'匈牙利',en:'Hungary',ja:'ハンガリー',ko:'헝가리',cl:'匈牙利'},
+      '罗马尼亚':{t:'羅馬尼亞',en:'Romania',ja:'ルーマニア',ko:'루마니아',cl:'羅馬尼亞'},
+      '保加利亚':{t:'保加利亞',en:'Bulgaria',ja:'ブルガリア',ko:'불가리아',cl:'保加利亞'},
+      '希腊':{t:'希臘',en:'Greece',ja:'ギリシャ',ko:'그리스',cl:'希臘'},
+      '土耳其':{t:'土耳其',en:'Turkey',ja:'トルコ',ko:'터키',cl:'土耳其'},
+      '塞浦路斯':{t:'賽普勒斯',en:'Cyprus',ja:'キプロス',ko:'키프로스',cl:'賽普勒斯'},
+      '瑞典':{t:'瑞典',en:'Sweden',ja:'スウェーデン',ko:'스웨덴',cl:'瑞典'},
+      '芬兰':{t:'芬蘭',en:'Finland',ja:'フィンランド',ko:'핀란드',cl:'芬蘭'},
+      '挪威':{t:'挪威',en:'Norway',ja:'ノルウェー',ko:'노르웨이',cl:'挪威'},
+      '丹麦':{t:'丹麥',en:'Denmark',ja:'デンマーク',ko:'덴마크',cl:'丹麥'},
+      '塞尔维亚':{t:'塞爾維亞',en:'Serbia',ja:'セルビア',ko:'세르비아',cl:'塞爾維亞'},
+      '克罗地亚':{t:'克羅埃西亞',en:'Croatia',ja:'クロアチア',ko:'크로아티아',cl:'克羅埃西亞'},
+      '斯洛文尼亚':{t:'斯洛維尼亞',en:'Slovenia',ja:'スロベニア',ko:'슬로베니아',cl:'斯洛維尼亞'},
+      '斯洛伐克':{t:'斯洛伐克',en:'Slovakia',ja:'スロバキア',ko:'슬로바키아',cl:'斯洛伐克'},
+      '乌克兰':{t:'烏克蘭',en:'Ukraine',ja:'ウクライナ',ko:'우크라이나',cl:'烏克蘭'},
+      '摩尔多瓦':{t:'摩爾多瓦',en:'Moldova',ja:'モルドバ',ko:'몰도바',cl:'摩爾多瓦'},
+      '白俄罗斯':{t:'白俄羅斯',en:'Belarus',ja:'ベラルーシ',ko:'벨라루스',cl:'白俄羅斯'},
+      '立陶宛':{t:'立陶宛',en:'Lithuania',ja:'リトアニア',ko:'리투아니아',cl:'立陶宛'},
+      '拉脱维亚':{t:'拉脫維亞',en:'Latvia',ja:'ラトビア',ko:'라트비아',cl:'拉脫維亞'},
+      '爱沙尼亚':{t:'愛沙尼亞',en:'Estonia',ja:'エストニア',ko:'에스토니아',cl:'愛沙尼亞'},
+      '马耳他':{t:'馬爾他',en:'Malta',ja:'マルタ',ko:'몰타',cl:'馬爾他'},
+      '阿尔巴尼亚':{t:'阿爾巴尼亞',en:'Albania',ja:'アルバニア',ko:'알바니아',cl:'阿爾巴尼亞'},
+      '俄罗斯':{t:'俄羅斯',en:'Russia',ja:'ロシア',ko:'러시아',cl:'俄羅斯'},
+      '格鲁吉亚':{t:'喬治亞',en:'Georgia',ja:'ジョージア',ko:'조지아',cl:'格魯吉亞'},
+      '阿塞拜疆':{t:'亞塞拜然',en:'Azerbaijan',ja:'アゼルバイジャン',ko:'아제르바이잔',cl:'亞塞拜然'},
+      '亚美尼亚':{t:'亞美尼亞',en:'Armenia',ja:'アルメニア',ko:'아르메니아',cl:'亞美尼亞'},
+      '美国':{t:'美國',en:'United States',ja:'アメリカ',ko:'미국',cl:'美國'},
+      '加拿大':{t:'加拿大',en:'Canada',ja:'カナダ',ko:'캐나다',cl:'加拿大'},
+      '墨西哥':{t:'墨西哥',en:'Mexico',ja:'メキシコ',ko:'멕시코',cl:'墨西哥'},
+      '古巴':{t:'古巴',en:'Cuba',ja:'キューバ',ko:'쿠바',cl:'古巴'},
+      '巴哈马':{t:'巴哈馬',en:'Bahamas',ja:'バハマ',ko:'바하마',cl:'巴哈馬'},
+      '多米尼加':{t:'多明尼加',en:'Dominican Republic',ja:'ドミニカ共和国',ko:'도미니카공화국',cl:'多明尼加'},
+      '海地':{t:'海地',en:'Haiti',ja:'ハイチ',ko:'아이티',cl:'海地'},
+      '牙买加':{t:'牙買加',en:'Jamaica',ja:'ジャマイカ',ko:'자메이카',cl:'牙買加'},
+      '巴西':{t:'巴西',en:'Brazil',ja:'ブラジル',ko:'브라질',cl:'巴西'},
+      '阿根廷':{t:'阿根廷',en:'Argentina',ja:'アルゼンチン',ko:'아르헨티나',cl:'阿根廷'},
+      '智利':{t:'智利',en:'Chile',ja:'チリ',ko:'칠레',cl:'智利'},
+      '秘鲁':{t:'祕魯',en:'Peru',ja:'ペルー',ko:'페루',cl:'祕魯'},
+      '哥伦比亚':{t:'哥倫比亞',en:'Colombia',ja:'コロンビア',ko:'콜롬비아',cl:'哥倫比亞'},
+      '委内瑞拉':{t:'委內瑞拉',en:'Venezuela',ja:'ベネズエラ',ko:'베네수엘라',cl:'委內瑞拉'},
+      '厄瓜多尔':{t:'厄瓜多爾',en:'Ecuador',ja:'エクアドル',ko:'에콰도르',cl:'厄瓜多爾'},
+      '玻利维亚':{t:'玻利維亞',en:'Bolivia',ja:'ボリビア',ko:'볼리비아',cl:'玻利維亞'},
+      '巴拉圭':{t:'巴拉圭',en:'Paraguay',ja:'パラグアイ',ko:'파라과이',cl:'巴拉圭'},
+      '乌拉圭':{t:'烏拉圭',en:'Uruguay',ja:'ウルグアイ',ko:'우루과이',cl:'烏拉圭'},
+      '圭亚那':{t:'圭亞那',en:'Guyana',ja:'ガイアナ',ko:'가이아나',cl:'圭亞那'},
+      '澳大利亚':{t:'澳大利亞',en:'Australia',ja:'オーストラリア',ko:'호주',cl:'澳大利亞'},
+      '新西兰':{t:'紐西蘭',en:'New Zealand',ja:'ニュージーランド',ko:'뉴질랜드',cl:'紐西蘭'},
+      '斐济':{t:'斐濟',en:'Fiji',ja:'フィジー',ko:'피지',cl:'斐濟'},
+      '巴布亚新几内亚':{t:'巴布亞紐幾內亞',en:'Papua New Guinea',ja:'パプアニューギニア',ko:'파푸아뉴기니',cl:'巴布亞'},
+      '法属波利尼西亚':{t:'法屬波里尼西亞',en:'French Polynesia',ja:'フランス領ポリネシア',ko:'프랑스령폴리네시아',cl:'法屬波里尼西亞'},
+      '美国（夏威夷）':{t:'美國（夏威夷）',en:'United States (Hawaii)',ja:'アメリカ（ハワイ）',ko:'미국(하와이)',cl:'美國（夏威夷）'}
+    };
+
+    // --- FIR Name Translations (Japanese) keyed by ICAO ---
+    const FIR_JA = {
+      DGAC:'アクラ',HAAA:'アディスアベバ',DAAA:'アルジェ',FMMM:'アンタナナリボ',HECC:'カイロ',
+      GMMM:'カサブランカ',GOOO:'ダカール',HTDC:'ダルエスサラーム',FTTC:'ンジャメナ',FAJA:'ヨハネスブルグ',
+      FZZA:'キンシャサ',DNKK:'ラゴス',FLFI:'ルサカ',HKNA:'ナイロビ',HLLL:'トリポリ',DTTC:'チュニス',FVHA:'ハラレ',
+      ZBPE:'北京',ZSHA:'上海',ZGZU:'広州',ZPKM:'昆明',ZHWH:'武漢',ZLHW:'蘭州',ZYSH:'瀋陽',ZWUQ:'ウルムチ',
+      ZJSA:'三亜',VHHK:'香港',RCAA:'台北',RJTG:'東京',RJJJ:'福岡',RKRR:'仁川',ZKKP:'平壌',
+      ZMUB:'ウランバートル',VVHN:'ハノイ',VVTS:'ホーチミン',VTBB:'バンコク',VDPP:'プノンペン',VLVT:'ビエンチャン',
+      VYYY:'ヤンゴン',WMFC:'クアラルンプール',WSJC:'シンガポール',WIIF:'ジャカルタ',RPHI:'マニラ',
+      VIDF:'デリー',VABF:'ムンバイ',VECF:'コルカタ',VOMF:'チェンナイ',VCCC:'コロンボ',
+      VGFR:'ダッカ',VNSM:'カトマンズ',OPKR:'カラチ',OPLR:'ラホール',OAKX:'カブール',
+      UATE:'アクタウ',UATT:'アクトベ',UAAA:'アルマトイ',UAII:'アスタナ',UTTR:'タシケント',
+      UCFM:'ビシュケク',UTDD:'ドゥシャンベ',UTAA:'アシガバート',
+      OIIX:'テヘラン',ORBB:'バグダッド',OEJD:'ジッダ',OMAE:'アブダビ',OTDB:'ドーハ',OBBB:'バーレーン',
+      OKAC:'クウェート',OOMM:'マスカット',OJAC:'アンマン',OLBB:'ベイルート',OSTT:'ダマスカス',
+      LLLL:'テルアビブ',OYSC:'サナア',
+      LFMM:'マルセイユ',LFFF:'パリ',LFRR:'ブレスト',LFBB:'ボルドー',EGTT:'ロンドン',EGPX:'スコットランド',
+      EISN:'シャノン',EDGG:'ランゲン',EDMM:'ミュンヘン',EDWW:'ブレーメン',LIMM:'ミラノ',LIRR:'ローマ',
+      LECM:'マドリード',LECB:'バルセロナ',LPPC:'リスボン',EHAA:'アムステルダム',EBBU:'ブリュッセル',
+      LSAS:'チューリッヒ',LSAG:'ジュネーブ',LOVV:'ウィーン',EPWW:'ワルシャワ',LKAA:'プラハ',
+      LHCC:'ブダペスト',LRBB:'ブカレスト',LBSR:'ソフィア',LGGG:'アテネ',LTAA:'アンカラ',LTBB:'イスタンブール',
+      LCCC:'ニコシア',ESAA:'ストックホルム',EFIN:'ヘルシンキ',ENOR:'ノルウェー',EKDK:'コペンハーゲン',
+      LYBA:'ベオグラード',LDZO:'ザグレブ',LJLA:'リュブリャナ',LZBB:'ブラチスラバ',
+      UKBV:'キーウ',LUUU:'キシナウ',UMMV:'ミンスク',EYVL:'ビリニュス',EVRR:'リガ',EETT:'タリン',
+      LMMM:'マルタ',LAAA:'ティラナ',
+      UUWV:'モスクワ',ULLL:'サンクトペテルブルク',USSS:'エカテリンブルク',UNNT:'ノヴォシビルスク',
+      UNKL:'クラスノヤルスク',UEEE:'ヤクーツク',UHHH:'ハバロフスク',UHMM:'マガダン',UWWW:'サマラ',
+      URRR:'ロストフ',UGGG:'トビリシ',UBBA:'バクー',UDDD:'エレバン',
+      KZNY:'ニューヨーク',KZDC:'ワシントン',KZAU:'シカゴ',KZLA:'ロサンゼルス',KZHU:'ヒューストン',
+      KZMA:'マイアミ',KZSE:'シアトル',KZDV:'デンバー',PAZA:'アンカレッジ',
+      CZUL:'モントリオール',CZYZ:'トロント',CZWG:'ウィニペグ',CZVR:'バンクーバー',CZEG:'エドモントン',
+      MMFR:'メキシコシティ',MUHH:'ハバナ',MYNA:'ナッソー',MDCS:'サントドミンゴ',MTEG:'ポルトープランス',MKJK:'キングストン',
+      SBBS:'ブラジリア',SBCW:'クリチバ',SBRE:'レシフェ',SBAZ:'アマゾニカ',
+      SAEF:'ブエノスアイレス',SCEZ:'サンティアゴ',SPIM:'リマ',SKEC:'ボゴタ',SVZM:'カラカス',
+      SEGU:'キト',SLLF:'ラパス',SGFA:'アスンシオン',SUEO:'モンテビデオ',SYEC:'ジョージタウン',
+      YBBB:'ブリスベン',YMMM:'メルボルン',NZZO:'オークランド',NFFF:'ナンディ',AYPM:'ポートモレスビー',
+      NTTT:'タヒチ',PHZH:'ホノルル'
+    };
+
+    // --- FIR Name Translations (Korean) keyed by ICAO ---
+    const FIR_KO = {
+      DGAC:'아크라',HAAA:'아디스아바바',DAAA:'알제',FMMM:'안타나나리보',HECC:'카이로',
+      GMMM:'카사블랑카',GOOO:'다카르',HTDC:'다르에스살람',FTTC:'은자메나',FAJA:'요하네스버그',
+      FZZA:'킨샤사',DNKK:'라고스',FLFI:'루사카',HKNA:'나이로비',HLLL:'트리폴리',DTTC:'튀니스',FVHA:'하라레',
+      ZBPE:'베이징',ZSHA:'상하이',ZGZU:'광저우',ZPKM:'쿤밍',ZHWH:'우한',ZLHW:'란저우',ZYSH:'선양',ZWUQ:'우루무치',
+      ZJSA:'싼야',VHHK:'홍콩',RCAA:'타이베이',RJTG:'도쿄',RJJJ:'후쿠오카',RKRR:'인천',ZKKP:'평양',
+      ZMUB:'울란바토르',VVHN:'하노이',VVTS:'호찌민',VTBB:'방콕',VDPP:'프놈펜',VLVT:'비엔티안',
+      VYYY:'양곤',WMFC:'쿠알라룸푸르',WSJC:'싱가포르',WIIF:'자카르타',RPHI:'마닐라',
+      VIDF:'델리',VABF:'뭄바이',VECF:'콜카타',VOMF:'첸나이',VCCC:'콜롬보',
+      VGFR:'다카',VNSM:'카트만두',OPKR:'카라치',OPLR:'라호르',OAKX:'카불',
+      UATE:'악타우',UATT:'악토베',UAAA:'알마티',UAII:'아스타나',UTTR:'타슈켄트',
+      UCFM:'비슈케크',UTDD:'두샨베',UTAA:'아시가바트',
+      OIIX:'테헤란',ORBB:'바그다드',OEJD:'제다',OMAE:'아부다비',OTDB:'도하',OBBB:'바레인',
+      OKAC:'쿠웨이트',OOMM:'무스카트',OJAC:'암만',OLBB:'베이루트',OSTT:'다마스쿠스',
+      LLLL:'텔아비브',OYSC:'사나',
+      LFMM:'마르세유',LFFF:'파리',LFRR:'브레스트',LFBB:'보르도',EGTT:'런던',EGPX:'스코틀랜드',
+      EISN:'섀넌',EDGG:'랑엔',EDMM:'뮌헨',EDWW:'브레멘',LIMM:'밀라노',LIRR:'로마',
+      LECM:'마드리드',LECB:'바르셀로나',LPPC:'리스본',EHAA:'암스테르담',EBBU:'브뤼셀',
+      LSAS:'취리히',LSAG:'제네바',LOVV:'빈',EPWW:'바르샤바',LKAA:'프라하',
+      LHCC:'부다페스트',LRBB:'부쿠레슈티',LBSR:'소피아',LGGG:'아테네',LTAA:'앙카라',LTBB:'이스탄불',
+      LCCC:'니코시아',ESAA:'스톡홀름',EFIN:'헬싱키',ENOR:'노르웨이',EKDK:'코펜하겐',
+      LYBA:'베오그라드',LDZO:'자그레브',LJLA:'류블랴나',LZBB:'브라티슬라바',
+      UKBV:'키이우',LUUU:'키시너우',UMMV:'민스크',EYVL:'빌뉴스',EVRR:'리가',EETT:'탈린',
+      LMMM:'몰타',LAAA:'티라나',
+      UUWV:'모스크바',ULLL:'상트페테르부르크',USSS:'예카테린부르크',UNNT:'노보시비르스크',
+      UNKL:'크라스노야르스크',UEEE:'야쿠츠크',UHHH:'하바롭스크',UHMM:'마가단',UWWW:'사마라',
+      URRR:'로스토프',UGGG:'트빌리시',UBBA:'바쿠',UDDD:'예레반',
+      KZNY:'뉴욕',KZDC:'워싱턴',KZAU:'시카고',KZLA:'로스앤젤레스',KZHU:'휴스턴',
+      KZMA:'마이애미',KZSE:'시애틀',KZDV:'덴버',PAZA:'앵커리지',
+      CZUL:'몬트리올',CZYZ:'토론토',CZWG:'위니펙',CZVR:'밴쿠버',CZEG:'에드먼턴',
+      MMFR:'멕시코시티',MUHH:'아바나',MYNA:'나소',MDCS:'산토도밍고',MTEG:'포르토프랭스',MKJK:'킹스턴',
+      SBBS:'브라질리아',SBCW:'쿠리치바',SBRE:'헤시피',SBAZ:'아마조니카',
+      SAEF:'부에노스아이레스',SCEZ:'산티아고',SPIM:'리마',SKEC:'보고타',SVZM:'카라카스',
+      SEGU:'키토',SLLF:'라파스',SGFA:'아순시온',SUEO:'몬테비데오',SYEC:'조지타운',
+      YBBB:'브리즈번',YMMM:'멜버른',NZZO:'오클랜드',NFFF:'난디',AYPM:'포트모르즈비',
+      NTTT:'타히티',PHZH:'호놀룰루'
+    };
+
+    // --- FIR Name Translations (Traditional Chinese) keyed by ICAO ---
+    const FIR_TW = {
+      DGAC:'阿克拉',HAAA:'阿迪斯阿貝巴',DAAA:'阿爾及爾',FMMM:'安塔那那利佛',HECC:'開羅',
+      GMMM:'卡薩布蘭卡',GOOO:'達喀爾',HTDC:'達累斯薩拉姆',FTTC:'恩賈梅納',FAJA:'約翰尼斯堡',
+      FZZA:'金沙薩',DNKK:'拉各斯',FLFI:'盧薩卡',HKNA:'奈洛比',HLLL:'的黎波里',DTTC:'突尼斯',FVHA:'哈拉雷',
+      ZBPE:'北京',ZSHA:'上海',ZGZU:'廣州',ZPKM:'昆明',ZHWH:'武漢',ZLHW:'蘭州',ZYSH:'瀋陽',ZWUQ:'烏魯木齊',
+      ZJSA:'三亞',VHHK:'香港',RCAA:'臺北',RJTG:'東京',RJJJ:'福岡',RKRR:'仁川',ZKKP:'平壤',
+      ZMUB:'烏蘭巴托',VVHN:'河內',VVTS:'胡志明',VTBB:'曼谷',VDPP:'金邊',VLVT:'萬象',
+      VYYY:'仰光',WMFC:'吉隆坡',WSJC:'新加坡',WIIF:'雅加達',RPHI:'馬尼拉',
+      VIDF:'德里',VABF:'孟買',VECF:'加爾各答',VOMF:'金奈',VCCC:'科倫坡',
+      VGFR:'達卡',VNSM:'加德滿都',OPKR:'卡拉奇',OPLR:'拉合爾',OAKX:'喀布爾',
+      UATE:'阿克套',UATT:'阿克糾賓斯克',UAAA:'阿拉木圖',UAII:'阿斯塔納',UTTR:'塔什干',
+      UCFM:'比什凱克',UTDD:'杜尚別',UTAA:'阿什哈巴德',
+      OIIX:'德黑蘭',ORBB:'巴格達',OEJD:'吉達',OMAE:'阿布達比',OTDB:'多哈',OBBB:'巴林',
+      OKAC:'科威特',OOMM:'馬斯喀特',OJAC:'安曼',OLBB:'貝魯特',OSTT:'大馬士革',
+      LLLL:'特拉維夫',OYSC:'薩那',
+      LFMM:'艾克斯普羅旺斯',LFFF:'巴黎',LFRR:'布雷斯特',LFBB:'波爾多',EGTT:'倫敦',EGPX:'蘇格蘭',
+      EISN:'香農',EDGG:'蘭根',EDMM:'慕尼黑',EDWW:'不來梅',LIMM:'米蘭',LIRR:'羅馬',
+      LECM:'馬德里',LECB:'巴塞隆納',LPPC:'里斯本',EHAA:'阿姆斯特丹',EBBU:'布魯塞爾',
+      LSAS:'蘇黎世',LSAG:'日內瓦',LOVV:'維也納',EPWW:'華沙',LKAA:'布拉格',
+      LHCC:'布達佩斯',LRBB:'布加勒斯特',LBSR:'索非亞',LGGG:'雅典',LTAA:'安卡拉',LTBB:'伊斯坦堡',
+      LCCC:'尼古西亞',ESAA:'斯德哥爾摩',EFIN:'赫爾辛基',ENOR:'挪威',EKDK:'哥本哈根',
+      LYBA:'貝爾格勒',LDZO:'薩格勒布',LJLA:'盧布爾雅那',LZBB:'布拉提斯拉瓦',
+      UKBV:'基輔',LUUU:'基希訥烏',UMMV:'明斯克',EYVL:'維爾紐斯',EVRR:'里加',EETT:'塔林',
+      LMMM:'馬爾他',LAAA:'地拉那',
+      UUWV:'莫斯科',ULLL:'聖彼得堡',USSS:'葉卡捷琳堡',UNNT:'新西伯利亞',
+      UNKL:'克拉斯諾亞爾斯克',UEEE:'雅庫茨克',UHHH:'哈巴羅夫斯克',UHMM:'馬加丹',UWWW:'薩馬拉',
+      URRR:'羅斯托夫',UGGG:'第比利斯',UBBA:'巴庫',UDDD:'埃里溫',
+      KZNY:'紐約',KZDC:'華盛頓',KZAU:'芝加哥',KZLA:'洛杉磯',KZHU:'休斯頓',
+      KZMA:'邁阿密',KZSE:'西雅圖',KZDV:'丹佛',PAZA:'安克雷奇',
+      CZUL:'蒙特婁',CZYZ:'多倫多',CZWG:'溫尼伯',CZVR:'溫哥華',CZEG:'艾德蒙頓',
+      MMFR:'墨西哥城',MUHH:'哈瓦那',MYNA:'拿騷',MDCS:'聖多明各',MTEG:'太子港',MKJK:'金斯頓',
+      SBBS:'巴西利亞',SBCW:'庫里蒂巴',SBRE:'累西腓',SBAZ:'亞馬遜',
+      SAEF:'布宜諾斯艾利斯',SCEZ:'聖地亞哥',SPIM:'利馬',SKEC:'波哥大',SVZM:'加拉加斯',
+      SEGU:'基多',SLLF:'拉巴斯',SGFA:'亞松森',SUEO:'蒙得維的亞',SYEC:'喬治敦',
+      YBBB:'布里斯班',YMMM:'墨爾本',NZZO:'奧克蘭',NFFF:'楠迪',AYPM:'莫爾茲比港',
+      NTTT:'塔希提',PHZH:'檀香山'
+    };
+
+    // ============================================================
+    //  I18N HELPER FUNCTIONS
+    // ============================================================
+    function t(key) { return (UI[currentLang] && UI[currentLang][key]) || UI['zh-CN'][key] || key; }
+
+    function getFIRName(fir) {
+      const lang = currentLang;
+      if (lang === 'en') return fir.nameEn;
+      if (lang === 'ja') return (FIR_JA[fir.icao] || fir.nameEn.replace(' FIR','')) + '飛行情報区';
+      if (lang === 'ko') return (FIR_KO[fir.icao] || fir.nameEn.replace(' FIR','')) + ' 비행정보구역';
+      if (lang === 'zh-TW') return (FIR_TW[fir.icao] || fir.name.replace('飞行情报区','')) + '飛行情報區';
+      if (lang === 'classical') return (FIR_TW[fir.icao] || fir.name.replace('飞行情报区','')) + '飛行情報區';
+      return fir.name;
+    }
+
+    function getFIRSubName(fir) {
+      const lang = currentLang;
+      if (lang === 'en') return fir.name;
+      return fir.nameEn;
+    }
+
+    function getCountryName(fir) {
+      const cn = fir.country;
+      const info = COUNTRY_I18N[cn];
+      if (!info) return cn;
+      if (currentLang === 'zh-CN') return cn;
+      if (currentLang === 'zh-TW') return info.t || cn;
+      if (currentLang === 'en') return info.en || fir.countryEn;
+      if (currentLang === 'ja') return info.ja || cn;
+      if (currentLang === 'ko') return info.ko || cn;
+      if (currentLang === 'classical') return info.cl || info.t || cn;
+      return cn;
+    }
+
+    function getContinentLabel(cont) {
+      return (CONT_LABEL[cont] && CONT_LABEL[cont][currentLang]) || cont;
+    }
+    function getContinentFilter(cont) {
+      return (CONTINENTS_I18N[cont] && CONTINENTS_I18N[cont][currentLang]) || cont;
+    }
+
+    function latLabel(v) {
+      const dir = v >= 0 ? t('latN') : t('latS');
+      if (currentLang === 'en') return `${Math.abs(v).toFixed(2)}° ${dir}`;
+      return `${dir} ${Math.abs(v).toFixed(2)}°`;
+    }
+    function lngLabel(v) {
+      const dir = v >= 0 ? t('lngE') : t('lngW');
+      if (currentLang === 'en') return `${Math.abs(v).toFixed(2)}° ${dir}`;
+      return `${dir} ${Math.abs(v).toFixed(2)}°`;
+    }
+
+    function toDMS(deg, isLat) {
+      const abs = Math.abs(deg);
+      const d = Math.floor(abs);
+      const m = Math.floor((abs - d) * 60);
+      const s = ((abs - d - m / 60) * 3600).toFixed(1);
+      const dir = isLat ? (deg >= 0 ? 'N' : 'S') : (deg >= 0 ? 'E' : 'W');
+      return `${d}°${m}′${s}″${dir}`;
+    }
+
+    // ============================================================
+    //  STATE
+    // ============================================================
+    let currentLang = localStorage.getItem('fir-lang') || 'zh-CN';
+    let currentFilter = '全部';
+    let searchTerm = '';
+    let detailMap = null;
+
+    // ============================================================
+    //  LANGUAGE SWITCH
+    // ============================================================
+    function toggleLangDropdown(e) {
+      e.stopPropagation();
+      const dd = document.getElementById('langDropdown');
+      const btn = document.getElementById('langBtn');
+      dd.classList.toggle('show');
+      btn.classList.toggle('open');
+    }
+    document.addEventListener('click', () => {
+      document.getElementById('langDropdown').classList.remove('show');
+      document.getElementById('langBtn').classList.remove('open');
+    });
+
+    function setLang(lang) {
+      currentLang = lang;
+      localStorage.setItem('fir-lang', lang);
+      document.getElementById('langDropdown').classList.remove('show');
+      document.getElementById('langBtn').classList.remove('open');
+
+      // Update lang button
+      const meta = LANG_META[lang];
+      document.getElementById('langFlag').textContent = meta.flag;
+      document.getElementById('langLabel').textContent = meta.label;
+
+      // Update active state in dropdown
+      document.querySelectorAll('.lang-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.lang === lang);
+      });
+
+      // Update dropdown header
+      document.getElementById('langDropdownHeader').textContent = t('langHeader');
+
+      updateUI();
+    }
+
+    function updateUI() {
+      // Header
+      document.getElementById('brandTitle').textContent = t('title');
+      document.getElementById('brandSubtitle').textContent = t('subtitle');
+      document.getElementById('searchInput').placeholder = t('searchPlaceholder');
+      document.getElementById('statsLabel').textContent = t('statsLabel');
+      document.getElementById('footerText').textContent = t('footer');
+
+      // Rebuild toolbar
+      buildToolbar();
+
+      // Re-render grid
+      applyFilters();
+    }
+
+    // ============================================================
+    //  BUILD TOOLBAR
+    // ============================================================
+    function buildToolbar() {
+      const tb = document.getElementById('toolbar');
+      const continents = ['全部','亚洲','欧洲','非洲','北美洲','南美洲','大洋洲','中东'];
+      let html = '';
+
+      continents.forEach(c => {
+        const label = c === '全部' ? t('filterAll') : getContinentFilter(c);
+        const active = currentFilter === c ? ' active' : '';
+        html += `<button class="filter-btn${active}" data-filter="${c}" onclick="setFilter('${c}', this)">${label}</button>`;
+      });
+
+      html += `<div class="toolbar-sep"></div>`;
+      html += `<select class="sort-select" id="sortSelect" onchange="applyFilters()">
+        <option value="name">${t('sortName')}</option>
+        <option value="country">${t('sortCountry')}</option>
+        <option value="icao">${t('sortICAO')}</option>
+      </select>`;
+      html += `<div class="result-count" id="resultCount"></div>`;
+
+      tb.innerHTML = html;
+    }
+
+    // ============================================================
+    //  INIT
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('totalCount').textContent = FIR_DATA.length;
+      const input = document.getElementById('searchInput');
+      let debounce;
+      input.addEventListener('input', () => {
+        clearTimeout(debounce);
+        debounce = setTimeout(() => {
+          searchTerm = input.value.trim();
+          document.getElementById('clearBtn').classList.toggle('show', searchTerm.length > 0);
+          applyFilters();
+        }, 200);
+      });
+
+      // Apply saved language
+      setLang(currentLang);
+    });
+
+    function clearSearch() {
+      const input = document.getElementById('searchInput');
+      input.value = '';
+      searchTerm = '';
+      document.getElementById('clearBtn').classList.remove('show');
+      applyFilters();
+      input.focus();
+    }
+
+    // ============================================================
+    //  FILTER / SORT
+    // ============================================================
+    function setFilter(f, btn) {
+      currentFilter = f;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      applyFilters();
+    }
+
+    function applyFilters() {
+      let data = [...FIR_DATA];
+
+      if (currentFilter !== '全部') {
+        data = data.filter(d => d.continent === currentFilter);
+      }
+
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        data = data.filter(d => {
+          const firName = getFIRName(d).toLowerCase();
+          const countryName = getCountryName(d).toLowerCase();
+          return firName.includes(q) ||
+                 d.name.toLowerCase().includes(q) ||
+                 d.nameEn.toLowerCase().includes(q) ||
+                 d.icao.toLowerCase().includes(q) ||
+                 d.country.toLowerCase().includes(q) ||
+                 d.countryEn.toLowerCase().includes(q) ||
+                 countryName.includes(q);
+        });
+      }
+
+      const sortEl = document.getElementById('sortSelect');
+      const sort = sortEl ? sortEl.value : 'name';
+      data.sort((a, b) => {
+        if (sort === 'name') return getFIRName(a).localeCompare(getFIRName(b), currentLang === 'ko' ? 'ko' : currentLang === 'ja' ? 'ja' : 'zh');
+        if (sort === 'country') return getCountryName(a).localeCompare(getCountryName(b));
+        return a.icao.localeCompare(b.icao);
+      });
+
+      renderGrid(data);
+    }
+
+    // ============================================================
+    //  RENDER GRID
+    // ============================================================
+    function renderGrid(data) {
+      const grid = document.getElementById('firGrid');
+      const rc = document.getElementById('resultCount');
+      if (rc) rc.innerHTML = t('resultFound').replace('{n}', data.length);
+
+      if (!data.length) {
+        grid.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <div class="empty-title">${t('emptyTitle')}</div>
+            <div class="empty-desc">${t('emptyDesc')}</div>
+          </div>`;
+        return;
+      }
+
+      grid.innerHTML = data.map((fir, i) => `
+        <div class="fir-card" onclick="openDetail('${fir.icao}')" style="animation: slideUp 0.3s ${i * 0.02}s both">
+          <div class="card-header">
+            <span class="card-icao">${fir.icao}</span>
+            <span class="card-continent continent-${fir.continent}">${getContinentLabel(fir.continent)}</span>
+          </div>
+          <div class="card-name">${highlightText(getFIRName(fir))}</div>
+          <div class="card-name-en">${highlightText(getFIRSubName(fir))}</div>
+          <div class="card-info">
+            <div class="card-info-row">
+              <span class="icon">🌐</span>
+              <span class="label">${t('cardCountry')}</span>
+              <span class="value">${highlightText(getCountryName(fir))}</span>
+            </div>
+            <div class="card-info-row">
+              <span class="icon">📍</span>
+              <span class="label">${t('cardCoord')}</span>
+              <span class="value">${latLabel(fir.lat)}，${lngLabel(fir.lng)}</span>
+            </div>
+          </div>
+          <div class="card-arrow">→</div>
+        </div>
+      `).join('');
+    }
+
+    function highlightText(text) {
+      if (!searchTerm) return text;
+      const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      return text.replace(regex, '<mark>$1</mark>');
+    }
+
+    // ============================================================
+    //  DETAIL MODAL
+    // ============================================================
+    function openDetail(icao) {
+      const fir = FIR_DATA.find(d => d.icao === icao);
+      if (!fir) return;
+
+      document.getElementById('modalIcao').innerHTML = `✈️ ${fir.icao}`;
+      document.getElementById('modalTitle').textContent = getFIRName(fir);
+      document.getElementById('modalSubtitle').textContent = getFIRSubName(fir);
+      document.getElementById('mapSectionTitle').innerHTML = t('mapTitle');
+
+      const dg = document.getElementById('detailGrid');
+      dg.innerHTML = `
+        <div class="detail-card">
+          <div class="dc-label">${t('modalCountry')}</div>
+          <div class="dc-value">${getCountryName(fir)}</div>
+          <div class="dc-sub">${currentLang === 'en' ? fir.country : fir.countryEn}</div>
+        </div>
+        <div class="detail-card">
+          <div class="dc-label">${t('modalICAO')}</div>
+          <div class="dc-value" style="font-family:'SF Mono','Fira Code',monospace;letter-spacing:1px">${fir.icao}</div>
+          <div class="dc-sub">${getContinentLabel(fir.continent)}</div>
+        </div>
+        <div class="detail-card full">
+          <div class="dc-label">${t('modalCenter')}</div>
+          <div class="coord-display">
+            <div class="coord-chip">
+              <span class="coord-label">${t('modalLat')}</span>
+              ${latLabel(fir.lat)}
+            </div>
+            <div class="coord-chip">
+              <span class="coord-label">${t('modalLng')}</span>
+              ${lngLabel(fir.lng)}
+            </div>
+            <div class="coord-chip">
+              <span class="coord-label">DMS</span>
+              ${toDMS(fir.lat, true)} ${toDMS(fir.lng, false)}
+            </div>
+          </div>
+        </div>
+        <div class="detail-card full">
+          <div class="dc-label">${t('modalBoundary')}</div>
+          <div class="coord-display" style="gap:8px">
+            ${fir.boundary.map((p, i) => `<div class="coord-chip" style="font-size:12px">P${i + 1}: ${p.lat.toFixed(2)}°, ${p.lng.toFixed(2)}°</div>`).join('')}
+          </div>
+        </div>
+      `;
+
+      const modal = document.getElementById('modal');
+      modal.classList.add('show');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => initDetailMap(fir), 100);
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('show');
+      document.body.style.overflow = '';
+      if (detailMap) { detailMap.remove(); detailMap = null; }
+    }
+
+    function closeModalOutside(e) {
+      if (e.target === document.getElementById('modal')) closeModal();
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    // ============================================================
+    //  MAP (Leaflet)
+    // ============================================================
+    function initDetailMap(fir) {
+      const container = document.getElementById('detail-map');
+      if (detailMap) { detailMap.remove(); detailMap = null; }
+
+      detailMap = L.map(container, { center: [fir.lat, fir.lng], zoom: 5, zoomControl: true, attributionControl: true });
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 18
+      }).addTo(detailMap);
+
+      if (fir.boundary && fir.boundary.length) {
+        // 支持不规则多边形绘制
+        const coords = fir.boundary.map(p => [p.lat, p.lng]);
+        
+        const polygon = L.polygon(coords, {
+          color: '#0284c7', 
+          weight: 3, 
+          fillColor: '#0ea5e9', 
+          fillOpacity: 0.15,
+          lineJoin: 'round',
+          dashArray: '8, 6',
+          className: 'fir-polygon-glow' // 添加 CSS 类用于发光效果
+        }).addTo(detailMap);
+
+        // 在 style 标签中添加发光效果样式
+        const style = document.createElement('style');
+        style.innerHTML = `
+          .fir-polygon-glow {
+            filter: drop-shadow(0 0 8px rgba(2, 132, 199, 0.4));
+          }
+          .custom-tooltip {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+          }
+        `;
+        document.head.appendChild(style);
+
+        detailMap.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+
+        // 绘制端点，增强不规则边界的识别度
+        fir.boundary.forEach((p, i) => {
+          L.circleMarker([p.lat, p.lng], {
+            radius: 4, 
+            fillColor: '#ffffff', 
+            color: '#0284c7', 
+            weight: 2, 
+            fillOpacity: 1
+          }).addTo(detailMap).bindTooltip(`Point ${i + 1}: ${p.lat.toFixed(3)}°, ${p.lng.toFixed(3)}°`, { 
+            direction: 'top',
+            offset: [0, -5],
+            className: 'custom-tooltip' 
+          });
+        });
+      }
+
+      const centerIcon = L.divIcon({
+        html: `<div style="width:40px;height:40px;background:linear-gradient(135deg,#0284c7,#0ea5e9);border-radius:12px;border:3px solid white;box-shadow:0 4px 15px rgba(2,132,199,0.3);display:flex;align-items:center;justify-content:center;font-size:20px;color:white;transform:rotate(-45deg);"><div style="transform:rotate(45deg)">✈</div></div>`,
+        className: '', iconSize: [40, 40], iconAnchor: [20, 20]
+      });
+
+      L.marker([fir.lat, fir.lng], { icon: centerIcon })
+        .addTo(detailMap)
+        .bindPopup(`
+          <div style="font-family:Inter,sans-serif;padding:8px">
+            <div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:2px">${getFIRName(fir)}</div>
+            <div style="font-size:12px;color:#64748b;margin-bottom:6px">${getFIRSubName(fir)}</div>
+            <div style="display:inline-block;padding:2px 8px;background:#f1f5f9;border-radius:4px;font-size:12px;color:#0284c7;font-weight:700;letter-spacing:1px">${fir.icao}</div>
+          </div>
+        `, { closeButton: false, offset: [0, -10] });
+
+      setTimeout(() => detailMap.invalidateSize(), 250);
+    }
+  </script>
+</body>
+</html>
