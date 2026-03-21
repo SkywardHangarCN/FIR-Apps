@@ -8,7 +8,8 @@ const BLACKOUT_EVENTS = [
     {
         month: 3, // 月份 (1-12)
         day: 21,  // 日期 (1-31)
-        title: "沉痛悼念 · 3·21空难遇难同胞",
+        title: "沉痛悼念
+            3·21空难遇难同胞",
         // 使用函数以支持动态年份计算
         getContent: (year) => {
             const anniversary = year - 2022;
