@@ -24,6 +24,36 @@
       --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
     }
 
+    .black-white-theme {
+      filter: grayscale(100%) !important;
+      -webkit-filter: grayscale(100%) !important;
+      -moz-filter: grayscale(100%) !important;
+      -ms-filter: grayscale(100%) !important;
+      -o-filter: grayscale(100%) !important;
+    }
+
+    /* ===== MEMORIAL MODAL ===== */
+    .memorial-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center;
+      z-index: 10000; backdrop-filter: blur(5px);
+    }
+    .memorial-content {
+      background: var(--white); width: 90%; max-width: 540px; border-radius: 20px;
+      padding: 40px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+      text-align: center; transform: translateY(20px); transition: all 0.4s;
+    }
+    .memorial-overlay.show { display: flex; }
+    .memorial-overlay.show .memorial-content { transform: translateY(0); }
+    .memorial-title { font-size: 24px; font-weight: 800; color: var(--gray-900); margin-bottom: 24px; letter-spacing: -0.5px; }
+    .memorial-text { font-size: 16px; line-height: 1.8; color: var(--gray-600); text-align: left; white-space: pre-wrap; margin-bottom: 32px; }
+    .memorial-btn {
+      background: var(--gray-900); color: var(--white); border: none; padding: 14px 48px;
+      border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .memorial-btn:hover { background: #000; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: var(--gray-100); color: var(--gray-800); min-height: 100vh; overflow-x: hidden;
@@ -354,6 +384,15 @@
   <!-- FOOTER -->
   <footer class="footer" id="footerText"></footer>
 
+  <!-- MEMORIAL MODAL -->
+  <div class="memorial-overlay" id="memorialModal">
+    <div class="memorial-content">
+      <div class="memorial-title" id="memorialTitle"></div>
+      <div class="memorial-text" id="memorialText"></div>
+      <button class="memorial-btn" onclick="closeMemorial()">确定</button>
+    </div>
+  </div>
+
   <!-- DETAIL MODAL -->
   <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
     <div class="modal-content" id="modalContent">
@@ -376,6 +415,7 @@
   </div>
 
   <!-- DATA -->
+  <script src="Black-data.js"></script>
   <script src="FIR-data.js"></script>
 
   <script>
@@ -404,7 +444,8 @@
         modalCountry: '🌐 覆盖国家/地区', modalICAO: '🏷️ ICAO 代码', modalCenter: '📍 中心坐标',
         modalBoundary: '📐 边界范围', modalLat: '纬度', modalLng: '经度', mapTitle: '🗺️ 飞行情报区覆盖范围',
         footer: 'Global FIR Explorer © 2026 — 全球飞行情报区信息仅供参考，请以官方航空公报为准',
-        latN: '北纬', latS: '南纬', lngE: '东经', lngW: '西经', langHeader: 'Language / 语言'
+        latN: '北纬', latS: '南纬', lngE: '东经', lngW: '西经', langHeader: 'Language / 语言',
+        geoLoc: '地理位置', overview: '概览', facilitySpecs: '设施规格', runways: '跑道', terminals: '航站楼', hubCarriers: '枢纽航空公司'
       },
       'zh-TW': {
         title: 'Global FIR Explorer', subtitle: '全球飛行情報區查詢系統',
@@ -417,7 +458,8 @@
         modalCountry: '🌐 覆蓋國家/地區', modalICAO: '🏷️ ICAO 代碼', modalCenter: '📍 中心座標',
         modalBoundary: '📐 邊界範圍', modalLat: '緯度', modalLng: '經度', mapTitle: '🗺️ 飛行情報區覆蓋範圍',
         footer: 'Global FIR Explorer © 2026 — 全球飛行情報區資訊僅供參考，請以官方航空公報為準',
-        latN: '北緯', latS: '南緯', lngE: '東經', lngW: '西經', langHeader: 'Language / 語言'
+        latN: '北緯', latS: '南緯', lngE: '東經', lngW: '西經', langHeader: 'Language / 語言',
+        geoLoc: '地理位置', overview: '概覽', facilitySpecs: '設施規格', runways: '跑道', terminals: '航廈', hubCarriers: '樞紐航空公司'
       },
       'en': {
         title: 'Global FIR Explorer', subtitle: 'Flight Information Region Database',
@@ -430,7 +472,8 @@
         modalCountry: '🌐 Coverage', modalICAO: '🏷️ ICAO Code', modalCenter: '📍 Center Coordinates',
         modalBoundary: '📐 Boundary', modalLat: 'LAT', modalLng: 'LNG', mapTitle: '🗺️ FIR Coverage Area',
         footer: 'Global FIR Explorer © 2026 — FIR data is for reference only. Please refer to official aeronautical publications.',
-        latN: 'N', latS: 'S', lngE: 'E', lngW: 'W', langHeader: 'Language'
+        latN: 'N', latS: 'S', lngE: 'E', lngW: 'W', langHeader: 'Language',
+        geoLoc: 'Geographic Location', overview: 'Overview', facilitySpecs: 'Facility Specs', runways: 'Runways', terminals: 'Terminals', hubCarriers: 'Hub Carriers'
       },
       'ja': {
         title: 'Global FIR Explorer', subtitle: '世界飛行情報区検索システム',
@@ -443,7 +486,8 @@
         modalCountry: '🌐 管轄国・地域', modalICAO: '🏷️ ICAOコード', modalCenter: '📍 中心座標',
         modalBoundary: '📐 境界範囲', modalLat: '緯度', modalLng: '経度', mapTitle: '🗺️ 飛行情報区カバー範囲',
         footer: 'Global FIR Explorer © 2026 — 飛行情報区データは参考情報です。公式の航空公報をご確認ください。',
-        latN: '北緯', latS: '南緯', lngE: '東経', lngW: '西経', langHeader: '言語 / Language'
+        latN: '北緯', latS: '南緯', lngE: '東経', lngW: '西経', langHeader: '言語 / Language',
+        geoLoc: '地理的位置', overview: '概要', facilitySpecs: '施設スペック', runways: '滑走路', terminals: 'ターミナル', hubCarriers: 'ハブ航空会社'
       },
       'ko': {
         title: 'Global FIR Explorer', subtitle: '세계 비행정보구역 검색 시스템',
@@ -456,7 +500,8 @@
         modalCountry: '🌐 관할 국가/지역', modalICAO: '🏷️ ICAO 코드', modalCenter: '📍 중심 좌표',
         modalBoundary: '📐 경계 범위', modalLat: '위도', modalLng: '경도', mapTitle: '🗺️ 비행정보구역 커버리지',
         footer: 'Global FIR Explorer © 2026 — 비행정보구역 데이터는 참고용입니다. 공식 항공 공보를 확인하세요.',
-        latN: '북위', latS: '남위', lngE: '동경', lngW: '서경', langHeader: '언어 / Language'
+        latN: '북위', latS: '남위', lngE: '동경', lngW: '서경', langHeader: '언어 / Language',
+        geoLoc: '지리적 위치', overview: '개요', facilitySpecs: '시설 사양', runways: '활주로', terminals: '터미널', hubCarriers: '허브 항공사'
       },
       'classical': {
         title: 'Global FIR Explorer', subtitle: '天下飛行情報區覽查典',
@@ -469,7 +514,8 @@
         modalCountry: '🌐 所轄邦國', modalICAO: '🏷️ ICAO 符碼', modalCenter: '📍 中心經緯',
         modalBoundary: '📐 疆界範圍', modalLat: '緯', modalLng: '經', mapTitle: '🗺️ 飛行情報區所轄疆域',
         footer: 'Global FIR Explorer © 2026 — 天下飛行情報區所載資料僅供參閱，當以官方航空公報為準',
-        latN: '北緯', latS: '南緯', lngE: '東經', lngW: '西經', langHeader: '語言 / Language'
+        latN: '北緯', latS: '南緯', lngE: '東經', lngW: '西經', langHeader: '語言 / Language',
+        geoLoc: '輿地', overview: '總敘', facilitySpecs: '設施規格', runways: '馳道', terminals: '候館', hubCarriers: '樞紐航空公司'
       }
     };
 
@@ -884,9 +930,54 @@
     }
 
     // ============================================================
+    //  BLACKOUT MODE & MEMORIAL
+    // ============================================================
+    function checkBlackoutEvents() {
+      if (typeof BLACKOUT_EVENTS === 'undefined') return;
+      
+      const now = new Date();
+      const month = now.getMonth() + 1; // 1-12
+      const day = now.getDate();
+      const year = now.getFullYear();
+
+      const event = BLACKOUT_EVENTS.find(e => e.month === month && e.day === day);
+      
+      if (event) {
+        if (event.enableGrayscale) {
+          document.documentElement.classList.add('black-white-theme');
+        }
+        
+        // Show Memorial Modal
+        const modal = document.getElementById('memorialModal');
+        const title = document.getElementById('memorialTitle');
+        const text = document.getElementById('memorialText');
+        
+        if (modal && title && text) {
+          title.textContent = event.title || "深切哀悼";
+          text.textContent = typeof event.getContent === 'function' 
+            ? event.getContent(year) 
+            : event.content;
+          
+          // Delay a bit to ensure everything is loaded
+          setTimeout(() => {
+            modal.classList.add('show');
+          }, 500);
+        }
+      }
+    }
+
+    function closeMemorial() {
+      const modal = document.getElementById('memorialModal');
+      if (modal) {
+        modal.classList.remove('show');
+      }
+    }
+
+    // ============================================================
     //  INIT
     // ============================================================
     document.addEventListener('DOMContentLoaded', () => {
+      checkBlackoutEvents();
       document.getElementById('totalCount').textContent = FIR_DATA.length;
       const input = document.getElementById('searchInput');
       let debounce;
